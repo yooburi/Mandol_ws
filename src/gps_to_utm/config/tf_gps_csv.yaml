@@ -1,0 +1,17 @@
+tf_gps_csv_node:
+  ros__parameters:
+
+    # # 1.
+    # csv_file_path: "/home/hannibal/Mandol_ws/data/processed/1_T_right_P_right_startR.csv"
+
+    # # 2.
+    # csv_file_path: "/home/hannibal/Mandol_ws/data/processed/2_T_right_P_left.csv"
+
+    # # 3.
+    # csv_file_path: "/home/hannibal/Mandol_ws/data/processed/3_T_left_P_right.csv"
+
+    # # 4.
+    csv_file_path: "/home/hannibal/Mandol_ws/data/processed/4_T_left_P_left.csv"
+
+    # # 5.
+    # csv_file_path: "/home/hannibal/Mandol_ws/data/processed/5_pass_startR.csv"

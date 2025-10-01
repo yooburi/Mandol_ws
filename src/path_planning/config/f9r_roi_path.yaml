@@ -1,0 +1,12 @@
+f9r_roi_path:
+    ros__parameters:
+        target_frame: "f9r"
+        csv_frame: "csv"
+        timer_frequency: 20.0
+        roi_length_m: 4.0
+        use_points_length: false
+        roi_length_points: 50
+        search_span_points: 2000
+        hysteresis_k: 0
+        line_width: 0.3
+        end_marker_size: 0.4

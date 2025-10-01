@@ -1,0 +1,20 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/yoo/workspace/gps_ws/install/ublox_msgs/local/lib/python3.10/dist-packages",
+        "/home/yoo/workspace/gps_ws/install/rtcm_msgs/local/lib/python3.10/dist-packages",
+        "/home/yoo/workspace/gps_ws/build/ntrip_client/src",
+        "/home/yoo/workspace/gps_ws/install/ntrip_client/lib/python3.10/site-packages",
+        "/home/yoo/.local/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/yoo/workspace/gps_ws/install/ublox_msgs/local/lib/python3.10/dist-packages",
+        "/home/yoo/workspace/gps_ws/install/rtcm_msgs/local/lib/python3.10/dist-packages",
+        "/home/yoo/workspace/gps_ws/build/ntrip_client/src",
+        "/home/yoo/workspace/gps_ws/install/ntrip_client/lib/python3.10/site-packages",
+        "/home/yoo/.local/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}

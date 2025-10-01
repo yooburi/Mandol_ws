@@ -1,0 +1,27 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/yoo/workspace/gps_ws/install/ublox_gps/include/**",
+        "/home/yoo/workspace/gps_ws/install/ublox_msgs/include/**",
+        "/home/yoo/workspace/gps_ws/install/ublox_serialization/include/**",
+        "/home/yoo/workspace/gps_ws/install/rtcm_msgs/include/**",
+        "/opt/ros/humble/include/**",
+        "/home/yoo/workspace/gps_ws/src/RTK_GPS_NTRIP/ublox_gps/include/**",
+        "/home/yoo/workspace/gps_ws/src/RTK_GPS_NTRIP/ublox_msgs/include/**",
+        "/home/yoo/workspace/gps_ws/src/RTK_GPS_NTRIP/ublox_serialization/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

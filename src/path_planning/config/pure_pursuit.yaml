@@ -1,0 +1,37 @@
+pure_pursuit_node:
+    ros__parameters:
+        # Main settings
+        input_marker_topic: "/f9r_roi_path"
+        base_frame: "f9r"
+        fallback_path_frame: "csv"
+        wheelbase: 0.724
+
+        # Lookahead range
+        fixed_lookahead: 2.5
+        min_lookahead: 1.6
+        max_lookahead: 2.5
+        back_ld_: 1.6
+
+        # Curvature-adaptive Ld (Exponential form)
+        beta: 4.0
+        curvature_window: 7
+        curvature_ema_alpha: 0.7
+        ld_ema_alpha: 0.5
+
+        # Steering output
+        steer_cmd_topic: "/auto_steer_angle"
+        steer_is_degree: true
+        steer_limit_deg: 20.0
+
+        # Throttle output
+        throttle_from_planning_topic: "/throttle_from_planning"
+        min_throttle: 0.5
+        max_throttle: 0.7
+        throttle_ema_alpha: 0.5
+
+        # Timing
+        control_rate_hz: 30.0
+
+        # Visualization
+        visualize: true
+        viz_ns: "pure_pursuit"
