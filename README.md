@@ -56,16 +56,17 @@ ROS 2 Humble 기반의 자율주행 실차/시뮬레이션을 위한 작업공�
 | **STOP_TRAFFIC** | `traffic_stop == true` **AND** `intersection == true` | 3 | `throttle = 0` (정지) | 신호 해제 + 히스테리시스 | 이전 미션으로 복귀 |
 
 flowchart LR
+  %% Nodes
   SAFE_OK[SAFE_OK\n(no stop signals)]
-  STOP_SLOPE[STOP_SLOPE\n(slope_stop==true)]
-  STOP_OBSTACLE[STOP_OBSTACLE\n(obstacle_existance==true)]
-  STOP_TRAFFIC[STOP_TRAFFIC\n(traffic_stop && intersection)]
-  SAFETY_HOLD[SAFETY_HOLD\n(throttle=0 or 0.15 on slope)]
+  STOP_SLOPE[STOP_SLOPE\n(slope_stop == true)]
+  STOP_OBSTACLE[STOP_OBSTACLE\n(obstacle_existance == true)]
+  STOP_TRAFFIC[STOP_TRAFFIC\n(traffic_stop == true && intersection == true)]
+  SAFETY_HOLD[SAFETY_HOLD\n(throttle = 0 or 0.15 on slope)]
   PREV[PREV_MISSION\n(return after release)]
 
-  %% Activations (priority)
-  STOP_SLOPE -->|priority 1 • hold ≥5s| SAFETY_HOLD
-  STOP_OBSTACLE -->|priority 2 • hold ≥5s| SAFETY_HOLD
+  %% Activations (priority order)
+  STOP_SLOPE -->|priority 1 • hold ≥ 5s| SAFETY_HOLD
+  STOP_OBSTACLE -->|priority 2 • hold ≥ 5s| SAFETY_HOLD
   STOP_TRAFFIC -->|priority 3 • hysteresis| SAFETY_HOLD
 
   %% Release / Recovery
