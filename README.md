@@ -55,31 +55,64 @@ ROS 2 Humble 기반의 자율주행 실차/시뮬레이션을 위한 작업공�
 | **STOP_OBSTACLE** | `obstacle_existance == true` | 2 | `throttle = 0` (정지) | **최소 5 s 유지** + 신호 `false` | 이전 미션으로 복귀 |
 | **STOP_TRAFFIC** | `traffic_stop == true` **AND** `intersection == true` | 3 | `throttle = 0` (정지) | 신호 해제 + 히스테리시스 | 이전 미션으로 복귀 |
 
+> Safety Layer
+```mermaid
 flowchart LR
-  %% Nodes
-  SAFE_OK[SAFE_OK\n(no stop signals)]
-  STOP_SLOPE[STOP_SLOPE\n(slope_stop == true)]
-  STOP_OBSTACLE[STOP_OBSTACLE\n(obstacle_existance == true)]
-  STOP_TRAFFIC[STOP_TRAFFIC\n(traffic_stop == true && intersection == true)]
-  SAFETY_HOLD[SAFETY_HOLD\n(throttle = 0 or 0.15 on slope)]
-  PREV[PREV_MISSION\n(return after release)]
+  SAFE_OK["SAFE_OK (no stop signals)"]
+  STOP_SLOPE["STOP_SLOPE (slope_stop == true)"]
+  STOP_OBSTACLE["STOP_OBSTACLE (obstacle_existance == true)"]
+  STOP_TRAFFIC["STOP_TRAFFIC (traffic_stop == true && intersection == true)"]
+  SAFETY_HOLD["SAFETY_HOLD (throttle = 0 or 0.15 on slope)"]
+  PREV["PREV_MISSION (return after release)"]
 
-  %% Activations (priority order)
-  STOP_SLOPE -->|priority 1 • hold ≥ 5s| SAFETY_HOLD
-  STOP_OBSTACLE -->|priority 2 • hold ≥ 5s| SAFETY_HOLD
-  STOP_TRAFFIC -->|priority 3 • hysteresis| SAFETY_HOLD
+  STOP_SLOPE -->|priority 1 - hold >= 5s| SAFETY_HOLD
+  STOP_OBSTACLE -->|priority 2 - hold >= 5s| SAFETY_HOLD
+  STOP_TRAFFIC -->|priority 3 - hysteresis| SAFETY_HOLD
 
-  %% Release / Recovery
   SAFETY_HOLD -->|signals false + hysteresis| PREV
   SAFE_OK -->|no preemption| PREV
+```
 
 
-### Misson Layer
-- 미션 레이어: 트리거/완료 신호 상승에지 기반 전이, 안전 선점 중에는 전이 금지
-- 스로틀 출력 정책:
-  - 전/후진 방향 전환 감지 시 `direction_switch_hold_sec` 동안 강제 정지(0)
-  - 안전 선점 시: 경사로만 0.15, 그 외 0.0
-  - 정상 시: `GPS_FWD`는 계획 스로틀 사용, `REVERSE_*`는 고정 후진 스로틀(-0.2)
+### 🚦Misson Layer
+> INIT에서 시작해 기본 주행(GPS_FWD)을 수행하며, 트리거가 오면 REVERSE_T / REVERSE_PARALLEL로 전환되고 완료 시 GPS_FWD로 복귀합니다. 어느 시점이든 STOP_* 발생 시 SAFETY_HOLD가 선점해 상태 진행을 멈추고, 해제되면 직전 미션으로 되돌아갑니다.
+
+| 상태                        | 진입 트리거                       | 활성 컨트롤러 / 주요 동작                             | 종료·전이 트리거                                                                                   | 비고                             |
+| ------------------------- | ---------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------ |
+| **INIT**                  | 노드 시작                        | 초기화, 파라미터 로드                                | 자동 전이 -> **GPS_FWD**                                                                        | 시작 상태                          |
+| **GPS_FWD**               | INIT 종료 또는 SAFETY_HOLD 해제 복귀 | **FWD_CONTROLLER** 활성, 전진 경로/속도 추종          | `/reverse_T/trigger` -> **REVERSE_T** / `/reverse_parallel/trigger` -> **REVERSE_PARALLEL** | STOP_* 발생 시 **SAFETY_HOLD** 선점 |
+| **REVERSE_T**             | `/reverse_T/trigger`         | **REVERSE_T_CONTROLLER** 활성(T자 후진 시퀀스)      | `/reverse_T/done` -> **GPS_FWD**                                                            | STOP_* 시 **SAFETY_HOLD**       |
+| **REVERSE_PARALLEL**      | `/reverse_parallel/trigger`  | **REVERSE_PARALLEL_CONTROLLER** 활성(평행주차 후진) | `/reverse_parallel/done` -> **GPS_FWD**                                                     | STOP_* 시 **SAFETY_HOLD**       |
+| **SAFETY_HOLD** *(선점 상태)* | 어떤 상태에서든 `STOP_* == true`    | 출력은 정지/저속 홀드, 활성 알고리즘은 유지                   | STOP_* 해제 + 히스테리시스 충족 -> **직전 상태 복귀**                                                       | 상태 진행 없음(선점 전용)                |
+
+> mission layer
+
+```mermaid
+stateDiagram-v2
+  [*] --> INIT
+  INIT --> GPS_FWD: start
+
+  state "GPS_FWD (FWD_CONTROLLER)" as GPS_FWD
+  state "REVERSE_T (REVERSE_T_CONTROLLER)" as REVERSE_T
+  state "REVERSE_PARALLEL (REVERSE_PARALLEL_CONTROLLER)" as REVERSE_PARALLEL
+  state "SAFETY_HOLD (preemptive hold)" as SAFETY_HOLD
+
+  %% Main transitions
+  GPS_FWD --> REVERSE_T: /reverse_T/trigger
+  REVERSE_T --> GPS_FWD: /reverse_T/done
+  GPS_FWD --> REVERSE_PARALLEL: /reverse_parallel/trigger
+  REVERSE_PARALLEL --> GPS_FWD: /reverse_parallel/done
+
+  %% Safety preemption (from any mission state)
+  GPS_FWD --> SAFETY_HOLD: any STOP_* active
+  REVERSE_T --> SAFETY_HOLD: any STOP_* active
+  REVERSE_PARALLEL --> SAFETY_HOLD: any STOP_* active
+
+  %% Recovery to previous mission after release
+  SAFETY_HOLD --> GPS_FWD: release -> prev_mission
+
+
+```
 
 **시나리오 예시**
 - 교차로 내 신호등 정지 활성 → 즉시 정지, 해제 히스테리시스 후 복귀
