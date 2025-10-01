@@ -1,6 +1,6 @@
-# Mandol_ws — ROS 2 자율주행 포트폴리오
+# Mandol_ws — ROS 2 자율주행
 
-Mandol_ws는 ROS 2 Humble 기반의 자율주행 실차/시뮬레이션을 위한 작업공간으로, GPS/RTK 기반 로컬라이제이션, 경로계획, 비전 인지, 미션 판단, 차량 구동까지 전체 파이프라인을 모듈화했습니다. 이 리포지토리의 핵심은 미션 레벨의 판단을 수행하는 `mission_supervisor` 노드입니다.
+ROS 2 Humble 기반의 자율주행 실차/시뮬레이션을 위한 작업공간으로, GPS/RTK 기반 로컬라이제이션, 경로계획, 비전 인지, 미션 판단, 차량 구동까지 전체 파이프라인을 모듈화했습니다.
 
 **핵심 가치**
 - 안전 선점(Safety preemption)과 미션 전이를 분리한 2계층 상태기계 설계
@@ -17,17 +17,15 @@ Mandol_ws는 ROS 2 Humble 기반의 자율주행 실차/시뮬레이션을 위�
 
 ---
 
-## mission_supervisor (핵심)
+## mission_supervisor
 
 미션 레이어와 세이프티 레이어를 분리한 선점형 상태기계 노드입니다. 안전 신호가 활성화되면 어떤 미션 상태에서도 즉시 선점하고, 해제 조건을 만족하면 이전 미션으로 자연스럽게 복귀합니다.
 
-- 노드: `mission_supervisor_node` (`mission_supervisor.mission_supervisor:main`)
-- 언어/런타임: Python, rclpy
+- 노드: `mission_supervisor_node`
 
 **상태 구조**
 - 미션 상태(`MissionState`): `INIT` → `GPS_FWD` ↔ `REVERSE_T` ↔ `REVERSE_PARALLEL`
 - 안전 상태(`SafetyStatus`): `SAFE_OK`, `STOP_SLOPE`, `STOP_OBSTACLE`, `STOP_TRAFFIC`
-- 활성 알고리즘(`ActiveAlgorithm`): `FWD_CONTROLLER`, `REVERSE_T_CONTROLLER`, `REVERSE_PARALLEL_CONTROLLER`, `SAFETY_HOLD`
 
 **구독 토픽 (입력)**
 - `/slope_stop` (`Bool`): 경사로 정지 신호
@@ -45,20 +43,37 @@ Mandol_ws는 ROS 2 Humble 기반의 자율주행 실차/시뮬레이션을 위�
 - `/safety_status` (`String`): 현재 안전 상태
 - `/safety_active` (`Bool`): 안전 선점 활성화 여부
 
-**주요 파라미터**
-- `loop_rate_hz` (기본 50.0): 메인 루프 주기
-- `hysteresis_sec` (기본 0.5): 정지 신호 해제 후 히스테리시스
-- `slope_hold_sec` (기본 5.0): 경사로 정지 유지 시간
-- `obstacle_hold_sec` (기본 5.0): 장애물 정지 유지 시간
-- `direction_switch_hold_sec` (기본 2.0): 전/후진 전환 시 정지 유지 시간
-- `throttle_topic` (기본 `/throttle_cmd`): 스로틀 명령 출력 토픽명
 
-**동작 요약**
-- 세이프티 레이어(선점):
-  - 경사로(`STOP_SLOPE`)는 세션 단위로 5초 유지, 유지 중에는 스로틀 0.15, 이후 같은 세션에서 재선점 방지
-  - 장애물(`STOP_OBSTACLE`)은 5초 유지 후 해제 히스테리시스 적용
-  - 신호등(`STOP_TRAFFIC`)은 교차로 내부에서만 유효, 해제 히스테리시스 적용
-  - 해제 시 이전 미션 상태로 복귀, `safety_active` 비활성화
+### 🛡️ Safety Layer (Preemptive Hold)
+
+> 어떤 미션 상태에서도 STOP 신호가 들어오면 **세이프티가 선점**하여 정지/저속 유지 후, 해제 시 **직전 미션으로 복귀**합니다.
+
+| 신호/상태 | 발동 조건 | 우선순위 | 홀드 중 액션 | 해제 조건(유지 포함) | 해제 후 동작 |
+|---|---|---|---|---|---|
+| **SAFE_OK** | 모든 `STOP_* == false` | — | 선점 없음 | — | 이전 미션 유지 |
+| **STOP_SLOPE** | `slope_stop == true` | 1 | `throttle = 0.15` (경사 보정) 또는 안전 정지 | **최소 5 s 유지** + 신호 `false` 안정화(히스테리시스) | **직전 미션**으로 복귀 |
+| **STOP_OBSTACLE** | `obstacle_existance == true` | 2 | `throttle = 0` (정지) | **최소 5 s 유지** + 신호 `false` | 이전 미션으로 복귀 |
+| **STOP_TRAFFIC** | `traffic_stop == true` **AND** `intersection == true` | 3 | `throttle = 0` (정지) | 신호 해제 + 히스테리시스 | 이전 미션으로 복귀 |
+
+flowchart LR
+  SAFE_OK[SAFE_OK\n(no stop signals)]
+  STOP_SLOPE[STOP_SLOPE\n(slope_stop==true)]
+  STOP_OBSTACLE[STOP_OBSTACLE\n(obstacle_existance==true)]
+  STOP_TRAFFIC[STOP_TRAFFIC\n(traffic_stop && intersection)]
+  SAFETY_HOLD[SAFETY_HOLD\n(throttle=0 or 0.15 on slope)]
+  PREV[PREV_MISSION\n(return after release)]
+
+  %% Activations (priority)
+  STOP_SLOPE -->|priority 1 • hold ≥5s| SAFETY_HOLD
+  STOP_OBSTACLE -->|priority 2 • hold ≥5s| SAFETY_HOLD
+  STOP_TRAFFIC -->|priority 3 • hysteresis| SAFETY_HOLD
+
+  %% Release / Recovery
+  SAFETY_HOLD -->|signals false + hysteresis| PREV
+  SAFE_OK -->|no preemption| PREV
+
+
+### Misson Layer
 - 미션 레이어: 트리거/완료 신호 상승에지 기반 전이, 안전 선점 중에는 전이 금지
 - 스로틀 출력 정책:
   - 전/후진 방향 전환 감지 시 `direction_switch_hold_sec` 동안 강제 정지(0)
@@ -103,7 +118,7 @@ Mandol_ws는 ROS 2 Humble 기반의 자율주행 실차/시뮬레이션을 위�
 
 ---
 
-## 아키텍처 한눈에 보기
+## 아키텍쳐
 
 - 인지(`mando_vision`) → `/traffic_stop`, `/obstacle_existance`
 - 로컬라이제이션/맵(`gps_to_utm`) → UTM/TF/CSV 경로
@@ -112,12 +127,4 @@ Mandol_ws는 ROS 2 Humble 기반의 자율주행 실차/시뮬레이션을 위�
 - 액추에이션(`serial_bridge`) → 시리얼로 차량 구동
 
 ---
-
-## 라이선스/저작권
-
-이 워크스페이스는 자체 코드와 서드파티 패키지를 함께 포함합니다. 패키지별 라이선스는 각 폴더의 `package.xml` 혹은 라이선스 파일을 참고하세요.
-
-## Maintainer
-
-- yoo <smzzang21@konkuk.ac.kr>
 
